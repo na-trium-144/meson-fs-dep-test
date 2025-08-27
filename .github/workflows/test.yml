@@ -38,13 +38,16 @@ jobs:
             -e CXX=g++-${{matrix.gcc_ver}}
           run: |
             set -e
-            add-apt-repository ppa:deadsnakes/ppa
             apt-get update -q -y
-            apt-get install -q -y build-essential gcc-${{matrix.gcc_ver}} g++-${{matrix.gcc_ver}} python3.10 python3.10-pip
-            pip3.10 install ninja
+            apt-get install -q -y software-properties-common wget
+            apt-get install -q -y build-essential gcc-${{matrix.gcc_ver}} g++-${{matrix.gcc_ver}}
+            apt-get install -q -y python3.7 python3.7-distutils
+            wget https://bootstrap.pypa.io/pip/3.7/get-pip.py
+            python3.7 ./get-pip.py
+            python3.7 -m pip install ninja
             cd /workspace
-            python3.10 ./meson/meson.py setup build
-            python3.10 ./meson/meson.py compile -C build
+            python3.7 ./meson/meson.py setup build
+            python3.7 ./meson/meson.py compile -C build
             ldd ./build/main
             ./build/main
 
@@ -53,27 +56,35 @@ jobs:
       fail-fast: false
       matrix:
         # https://github.com/KyleMayes/install-llvm-action/blob/master/assets.json
-        clang: [5, 6, 7, 8, 9, 10]
+        clang: ["5.0", "6.0", 7, 8, 9, 10]
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v4
     - run: git clone -b cpp-filesystem-dep https://github.com/na-trium-144/meson
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libtinfo5 || true
-    - name: Install clang
-      uses: KyleMayes/install-llvm-action@master
+    - uses: addnab/docker-run-action@v3
       with:
-        version: "${{matrix.clang}}"
-    - run: pip install ninja
-    - run: python3.10 ./meson/meson.py setup build
-      env:
-        CC: ${{ env.LLVM_PATH }}/bin/clang
-        CXX: ${{ env.LLVM_PATH }}/bin/clang++
-    - run: python3.10 ./meson/meson.py compile -C build
-      env:
-        CC: ${{ env.LLVM_PATH }}/bin/clang
-        CXX: ${{ env.LLVM_PATH }}/bin/clang++
-    - run: ldd ./build/main
-    - run: ./build/main
+        image: ubuntu:18.04
+        options: >
+          -v ${{ github.workspace }}:/workspace
+          -e SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+          -e DEBIAN_FRONTEND=noninteractive
+          -e CC=clang-${{matrix.clang}}
+          -e CXX=clang++-${{matrix.clang}}
+        run: |
+          set -e
+          apt-get update
+          apt-get install -q -y software-properties-common wget
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          apt-add-repository "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-${{matrix.clang}} main"
+          apt-get install -q -y build-essential python3.7
+          apt-get install -q -y llvm-${{matrix.clang}} clang-${{matrix.clang}} lld-${{matrix.clang}}
+          apt-get install -q -y python3.7 python3.7-distutils
+          wget https://bootstrap.pypa.io/pip/3.7/get-pip.py
+          python3.7 ./get-pip.py
+          python3.7 -m pip install ninja
+          cd /workspace
+          python3.7 ./meson/meson.py setup build -Dcpp_args="--stdlib=libc++" -Dlink_args="-fuse-ld=lld"
+          python3.7 ./meson/meson.py compile -C build
+          ldd ./build/main
+          ./build/main
+
