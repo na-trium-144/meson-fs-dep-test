@@ -1,0 +1,79 @@
+name: CMake Test (Linux, Many GCC Versions)
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  test-linux-gcc:
+    strategy:
+      fail-fast: false
+      matrix:
+        gcc_ver: [5, 6, 7, 8, 9, 10]
+        include:
+        - distro: "18.04"
+          gcc_ver: 5
+        - distro: "18.04"
+          gcc_ver: 6
+        - distro: "20.04"
+          gcc_ver: 7
+        - distro: "20.04"
+          gcc_ver: 8
+        - distro: "20.04"
+          gcc_ver: 9
+        - distro: "20.04"
+          gcc_ver: 10
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: git clone -b cpp-filesystem-dep https://github.com/na-trium-144/meson
+      - uses: addnab/docker-run-action@v3
+        with:
+          image: ubuntu:${{matrix.distro}}
+          options: >
+            -v ${{ github.workspace }}:/workspace
+            -e SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+            -e DEBIAN_FRONTEND=noninteractive
+            -e CC=gcc-${{matrix.gcc_ver}}
+            -e CXX=g++-${{matrix.gcc_ver}}
+          run: |
+            set -e
+            add-apt-repository ppa:deadsnakes/ppa
+            apt-get update -q -y
+            apt-get install -q -y build-essential gcc-${{matrix.gcc_ver}} g++-${{matrix.gcc_ver}} python3.10 python3.10-pip
+            pip3.10 install ninja
+            cd /workspace
+            python3.10 ./meson/meson.py setup build
+            python3.10 ./meson/meson.py compile -C build
+            ldd ./build/main
+            ./build/main
+
+  test-linux-clang:
+    strategy:
+      fail-fast: false
+      matrix:
+        # https://github.com/KyleMayes/install-llvm-action/blob/master/assets.json
+        clang: [5, 6, 7, 8, 9, 10]
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v4
+    - run: git clone -b cpp-filesystem-dep https://github.com/na-trium-144/meson
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libtinfo5 || true
+    - name: Install clang
+      uses: KyleMayes/install-llvm-action@master
+      with:
+        version: "${{matrix.clang}}"
+    - run: pip install ninja
+    - run: python3.10 ./meson/meson.py setup build
+      env:
+        CC: ${{ env.LLVM_PATH }}/bin/clang
+        CXX: ${{ env.LLVM_PATH }}/bin/clang++
+    - run: python3.10 ./meson/meson.py compile -C build
+      env:
+        CC: ${{ env.LLVM_PATH }}/bin/clang
+        CXX: ${{ env.LLVM_PATH }}/bin/clang++
+    - run: ldd ./build/main
+    - run: ./build/main
