@@ -53,7 +53,7 @@ jobs:
             fi
             cd /workspace
             python3 ./meson/meson.py setup build
-            python3 ./meson/meson.py compile -C build
+            ninja -C build -v
             ldd ./build/main
             ./build/main
 
@@ -89,7 +89,7 @@ jobs:
           python3.7 -m pip install ninja
           cd /workspace
           python3.7 ./meson/meson.py setup build -Dcpp_args="--stdlib=libc++" -Dcpp_link_args="--stdlib=libc++ -fuse-ld=lld"
-          python3.7 ./meson/meson.py compile -C build
+          ninja -C build -v
           ldd ./build/main
           ./build/main
 
