@@ -41,13 +41,19 @@ jobs:
             apt-get update -q -y
             apt-get install -q -y software-properties-common wget
             apt-get install -q -y build-essential gcc-${{matrix.gcc_ver}} g++-${{matrix.gcc_ver}}
-            apt-get install -q -y python3.7 python3.7-distutils
-            wget https://bootstrap.pypa.io/pip/3.7/get-pip.py
-            python3.7 ./get-pip.py
-            python3.7 -m pip install ninja
+            if [ ${{matrix.distro}} = "18.04" ]; then
+              apt-get install -q -y python3.7 python3.7-distutils
+              wget https://bootstrap.pypa.io/pip/3.7/get-pip.py
+              python3.7 ./get-pip.py
+              python3.7 -m pip install ninja
+              alias python3=python3.7
+            else
+              apt-get install -q -y python3 python3-pip
+              python3 -m pip install ninja
+            fi
             cd /workspace
-            python3.7 ./meson/meson.py setup build
-            python3.7 ./meson/meson.py compile -C build
+            python3 ./meson/meson.py setup build
+            python3 ./meson/meson.py compile -C build
             ldd ./build/main
             ./build/main
 
@@ -74,7 +80,7 @@ jobs:
           set -e
           apt-get update
           apt-get install -q -y software-properties-common wget
-          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
           apt-add-repository "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-${{matrix.clang}} main"
           apt-get install -q -y build-essential python3.7
           apt-get install -q -y llvm-${{matrix.clang}} clang-${{matrix.clang}} lld-${{matrix.clang}}
